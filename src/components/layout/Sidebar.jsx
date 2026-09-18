@@ -9,7 +9,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab }) {
+export default function Sidebar({ activeTab, setActiveTab, theme }) {
   const navItems = [
     {
       id: 'tasks',
@@ -46,10 +46,10 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <aside className="w-full md:w-72 glass-panel border-r border-slate-800/80 p-4 flex flex-col justify-between gap-6 shrink-0">
+    <aside className="w-full md:w-72 glass-panel border-r border-slate-200 dark:border-slate-800/80 p-4 flex flex-col justify-between gap-6 shrink-0">
       <div>
-        <div className="px-3 py-2 text-[11px] font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
-          <Layers className="w-3.5 h-3.5 text-cyan-400" /> Platform Navigation
+        <div className="px-3 py-2 text-[11px] font-bold tracking-wider text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+          <Layers className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" /> Platform Navigation
         </div>
 
         <div className="mt-3 space-y-2">
@@ -62,23 +62,23 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                 onClick={() => setActiveTab(item.id)}
                 className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between group ${
                   isActive
-                    ? 'bg-gradient-to-r from-slate-800/90 to-slate-900/90 border border-slate-700/80 shadow-lg text-white'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                    ? 'bg-gradient-to-r from-blue-500/15 to-cyan-500/10 dark:from-slate-800/90 dark:to-slate-900/90 border border-cyan-500/30 dark:border-slate-700/80 shadow-md text-slate-900 dark:text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/40'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center text-white bg-gradient-to-br ${item.color} ${
-                      isActive ? 'shadow-md shadow-cyan-500/20' : 'opacity-80 group-hover:opacity-100'
+                      isActive ? 'shadow-md shadow-cyan-500/20 ring-2 ring-cyan-400/40' : 'opacity-80 group-hover:opacity-100'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
+                    <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                       {item.label}
                     </div>
-                    <div className="text-[10px] text-slate-400 line-clamp-1">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1">
                       {item.description}
                     </div>
                   </div>
@@ -86,7 +86,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
                 <ChevronRight
                   className={`w-4 h-4 transition-transform ${
-                    isActive ? 'text-cyan-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'
+                    isActive ? 'text-cyan-600 dark:text-cyan-400 translate-x-0.5' : 'text-slate-400 dark:text-slate-600 group-hover:text-slate-600 dark:group-hover:text-slate-400'
                   }`}
                 />
               </button>
@@ -96,15 +96,15 @@ export default function Sidebar({ activeTab, setActiveTab }) {
       </div>
 
       {/* System Status Card */}
-      <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/90 space-y-2">
+      <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/90 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
             MCP Protocol Active
           </div>
-          <span className="text-[10px] text-cyan-400 font-mono">v1.2.0</span>
+          <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono font-bold">v1.3.0</span>
         </div>
-        <p className="text-[10px] text-slate-400 leading-relaxed">
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
           Retrieval-Augmented Generation & Tool execution online for task telemetry & market insights.
         </p>
       </div>

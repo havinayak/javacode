@@ -37,6 +37,15 @@ export default function App() {
     storageService.saveThresholds(thresholds);
   }, [thresholds]);
 
+  const handleAgentAction = (action) => {
+    if (!action) return;
+    if (action.type === 'ADD_TASK' && action.payload) {
+      setTasks(prev => [action.payload, ...prev]);
+    } else if (action.type === 'UPDATE_THRESHOLD' && action.payload) {
+      setThresholds(prev => ({ ...prev, globalTarget: action.payload.target }));
+    }
+  };
+
   return (
     <div className={`min-h-screen ${theme === 'light' ? 'bg-slate-100 text-slate-900' : 'bg-[#090d16] text-slate-100'} flex flex-col font-sans selection:bg-cyan-500 selection:text-black transition-colors duration-300`}>
       {/* Top Navigation */}
@@ -85,6 +94,7 @@ export default function App() {
         isOpen={isMcpDrawerOpen}
         onClose={() => setIsMcpDrawerOpen(false)}
         theme={theme}
+        onAgentAction={handleAgentAction}
       />
 
       {/* Futuristic Background Glow Elements */}

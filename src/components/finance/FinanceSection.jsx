@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, DollarSign, Search, ShieldCheck, 
   HelpCircle, ChevronRight, AlertTriangle, ArrowUpRight, ArrowDownRight, 
-  Calendar, Layers, FileText, Activity, Plus, Sparkles, Zap, Factory, ShieldAlert
+  Calendar, Layers, FileText, Activity, Plus, Sparkles, Zap, Factory, ShieldAlert, Download
 } from 'lucide-react';
 import { ragEngine } from '../../services/ragEngine';
+import { storageService } from '../../services/storageService';
 
-export default function FinanceSection({ globalSearchQuery, theme }) {
-  const [selectedStock, setSelectedStock] = useState(null);
-  const [stockFilter, setStockFilter] = useState('all'); // 'all', 'rising', 'falling', 'sudden'
-  const [localSearch, setLocalSearch] = useState('');
-  const [customTickerInput, setCustomTickerInput] = useState('');
-  
-  // Base stocks with sudden volatility & deep industrial root cause metrics
-  const [stockList, setStockList] = useState([
+// Base stocks with sudden volatility & deep industrial root cause metrics
+const DEFAULT_STOCKS = [
     {
       ticker: 'NVDA',
       name: 'NVIDIA Corporation',
@@ -125,7 +120,25 @@ export default function FinanceSection({ globalSearchQuery, theme }) {
         { date: '01:30 PM', event: 'European market share reports indicated increased competition from BYD.' }
       ]
     }
-  ]);
+  ];
+
+export default function FinanceSection({ globalSearchQuery, theme }) {
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [stockFilter, setStockFilter] = useState('all'); // 'all', 'rising', 'falling', 'sudden'
+  const [localSearch, setLocalSearch] = useState('');
+  const [customTickerInput, setCustomTickerInput] = useState('');
+
+  const [stockList, setStockList] = useState(() => {
+    const saved = storageService.getSavedStocks();
+    const existing = new Set(DEFAULT_STOCKS.map(s => s.ticker));
+    const custom = saved.filter(s => !existing.has(s.ticker));
+    return [...custom, ...DEFAULT_STOCKS];
+  });
+
+  useEffect(() => {
+    const customOnly = stockList.filter(s => !DEFAULT_STOCKS.some(d => d.ticker === s.ticker));
+    storageService.saveSavedStocks(customOnly);
+  }, [stockList]);
 
   const handleAddOrSearchStock = (e) => {
     e?.preventDefault();
@@ -185,25 +198,36 @@ export default function FinanceSection({ globalSearchQuery, theme }) {
           </p>
         </div>
 
-        {/* Add Stock Ticker Form */}
-        <form onSubmit={handleAddOrSearchStock} className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search ticker (e.g. AAPL, AMZN)..."
-              value={customTickerInput}
-              onChange={(e) => setCustomTickerInput(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-xs bg-white/80 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:outline-none focus:border-emerald-500 font-mono w-52"
-            />
-          </div>
+        {/* Add Stock Ticker Form & Export */}
+        <div className="flex items-center gap-2">
+          <form onSubmit={handleAddOrSearchStock} className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search ticker (e.g. AAPL, AMZN)..."
+                value={customTickerInput}
+                onChange={(e) => setCustomTickerInput(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-xs bg-white/80 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:outline-none focus:border-emerald-500 font-mono w-48"
+              />
+            </div>
+            <button
+              type="submit"
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 rounded-lg shadow-md transition-all shrink-0"
+            >
+              <Plus className="w-4 h-4" /> Analyze
+            </button>
+          </form>
+
           <button
-            type="submit"
-            className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 rounded-lg shadow-md transition-all shrink-0"
+            onClick={() => storageService.exportPerformanceReport([], { globalTarget: 80 }, stockList)}
+            title="Download Intelligence Report (JSON)"
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-200/80 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded-lg shadow-sm transition-all shrink-0"
           >
-            <Plus className="w-4 h-4" /> Analyze
+            <Download className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Export</span>
           </button>
-        </form>
+        </div>
       </div>
 
       {/* Preset Quick Stock Chips */}

@@ -4,7 +4,8 @@ const STORAGE_KEYS = {
   TASKS: 'omnipulse_tasks',
   THRESHOLDS: 'omnipulse_thresholds',
   USER_NOTES: 'omnipulse_notes',
-  SAVED_REPORTS: 'omnipulse_reports'
+  SAVED_REPORTS: 'omnipulse_reports',
+  SAVED_STOCKS: 'omnipulse_stocks'
 };
 
 const DEFAULT_TASKS = [
@@ -17,6 +18,7 @@ const DEFAULT_TASKS = [
     currentProgress: 90,
     completed: true,
     date: '2026-09-10',
+    lastModified: '2026-09-10T14:30:00.000Z',
     history: [
       { date: '2026-09-07', score: 40 },
       { date: '2026-09-08', score: 65 },
@@ -34,6 +36,7 @@ const DEFAULT_TASKS = [
     currentProgress: 80,
     completed: true,
     date: '2026-09-11',
+    lastModified: '2026-09-11T09:15:00.000Z',
     history: [
       { date: '2026-09-07', score: 70 },
       { date: '2026-09-08', score: 75 },
@@ -52,6 +55,7 @@ const DEFAULT_TASKS = [
     currentProgress: 95,
     completed: true,
     date: '2026-09-12',
+    lastModified: '2026-09-12T16:45:00.000Z',
     history: [
       { date: '2026-09-07', score: 80 },
       { date: '2026-09-08', score: 85 },
@@ -71,6 +75,7 @@ const DEFAULT_TASKS = [
     currentProgress: 60,
     completed: false,
     date: '2026-09-13',
+    lastModified: '2026-09-13T18:20:00.000Z',
     history: [
       { date: '2026-09-07', score: 30 },
       { date: '2026-09-08', score: 45 },
@@ -91,6 +96,7 @@ const DEFAULT_TASKS = [
     currentProgress: 70,
     completed: true,
     date: '2026-09-13',
+    lastModified: '2026-09-13T21:00:00.000Z',
     history: [
       { date: '2026-09-10', score: 50 },
       { date: '2026-09-11', score: 60 },
@@ -130,6 +136,87 @@ export const storageService = {
       localStorage.setItem(STORAGE_KEYS.THRESHOLDS, JSON.stringify(thresholds));
     } catch (e) {
       console.error('Failed to save thresholds', e);
+    }
+  },
+  getSavedStocks: () => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.SAVED_STOCKS);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+  saveSavedStocks: (stocks) => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SAVED_STOCKS, JSON.stringify(stocks));
+    } catch (e) {
+      console.error('Failed to save stocks', e);
+    }
+  },
+  getNotes: () => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.USER_NOTES);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+  saveNotes: (notes) => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.USER_NOTES, JSON.stringify(notes));
+    } catch (e) {
+      console.error('Failed to save notes', e);
+    }
+  },
+  exportPerformanceReport: (tasks, thresholds, stockList = []) => {
+    try {
+      const completedTasks = tasks.filter(t => t.completed);
+      const avgScore = tasks.length > 0
+        ? Math.round(tasks.reduce((a, b) => a + b.currentProgress, 0) / tasks.length)
+        : 0;
+
+      const reportData = {
+        title: 'OmniPulse AI Intelligence & Telemetry Audit',
+        generatedAt: new Date().toISOString(),
+        summary: {
+          totalTasks: tasks.length,
+          completedTasks: completedTasks.length,
+          completionRate: `${tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0}%`,
+          averageProgressScore: `${avgScore}%`,
+          globalTargetThreshold: `${thresholds.globalTarget}%`,
+          thresholdStatus: avgScore >= thresholds.globalTarget ? 'TARGET MET (+ PASSED)' : 'BELOW TARGET'
+        },
+        tasks: tasks.map(t => ({
+          title: t.title,
+          category: t.category,
+          priority: t.priority,
+          targetThreshold: t.targetThreshold,
+          currentProgress: t.currentProgress,
+          completed: t.completed,
+          notes: t.notes || 'None'
+        })),
+        trackedStocks: stockList.map(s => ({
+          ticker: s.ticker,
+          name: s.name,
+          price: s.price,
+          change: s.change,
+          catalyst: s.catalyst
+        }))
+      };
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `OmniPulse_Report_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (err) {
+      console.error('Failed to export report', err);
+      return false;
     }
   }
 };
