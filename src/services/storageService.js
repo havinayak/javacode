@@ -112,7 +112,7 @@ export const storageService = {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.TASKS);
       return data ? JSON.parse(data) : DEFAULT_TASKS;
-    } catch {
+    } catch (e) {
       return DEFAULT_TASKS;
     }
   },
@@ -127,7 +127,7 @@ export const storageService = {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.THRESHOLDS);
       return data ? JSON.parse(data) : { globalTarget: 80, warningThreshold: 60 };
-    } catch {
+    } catch (e) {
       return { globalTarget: 80, warningThreshold: 60 };
     }
   },
@@ -142,7 +142,7 @@ export const storageService = {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SAVED_STOCKS);
       return data ? JSON.parse(data) : [];
-    } catch {
+    } catch (e) {
       return [];
     }
   },
@@ -157,7 +157,7 @@ export const storageService = {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.USER_NOTES);
       return data ? JSON.parse(data) : [];
-    } catch {
+    } catch (e) {
       return [];
     }
   },

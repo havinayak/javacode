@@ -86,7 +86,7 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
           setThresholds(event.data.thresholds);
         }
       };
-    } catch {
+    } catch (e) {
       // BroadcastChannel not supported, degrade gracefully
     }
 
@@ -99,7 +99,7 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
             isExternalUpdate.current = true;
             setTasks(parsed);
           }
-        } catch { /* ignore */ }
+        } catch (e) { /* ignore */ }
       }
       if (e.key === 'omnipulse_thresholds') {
         try {
@@ -108,7 +108,7 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
             isExternalThresholdUpdate.current = true;
             setThresholds(parsed);
           }
-        } catch { /* ignore */ }
+        } catch (e) { /* ignore */ }
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -127,7 +127,7 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
     }
     try {
       broadcastChannelRef.current?.postMessage({ type: 'TASKS_UPDATE', tasks });
-    } catch { /* ignore */ }
+    } catch (e) { /* ignore */ }
   }, [tasks]);
 
   // Broadcast threshold changes to other tabs
@@ -138,7 +138,7 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
     }
     try {
       broadcastChannelRef.current?.postMessage({ type: 'THRESHOLDS_UPDATE', thresholds });
-    } catch { /* ignore */ }
+    } catch (e) { /* ignore */ }
   }, [thresholds]);
 
   // ── Live Task Stopwatch Timer Engine ──
