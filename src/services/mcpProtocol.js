@@ -84,6 +84,7 @@ export const mcpProtocol = {
     switch (toolName) {
       case 'create_task': {
         const { title = 'New Task', category = 'Work', priority = 'Medium', threshold = 80, progress = 40 } = args;
+        const nowIso = new Date().toISOString();
         const taskObj = {
           id: `task-${Date.now()}`,
           title,
@@ -92,8 +93,9 @@ export const mcpProtocol = {
           targetThreshold: Number(threshold),
           currentProgress: Number(progress),
           completed: Number(progress) >= Number(threshold),
-          date: new Date().toISOString().split('T')[0],
-          lastModified: new Date().toISOString(),
+          createdAt: nowIso,
+          date: nowIso.split('T')[0],
+          lastModified: nowIso,
           history: [{ date: 'Today', score: Number(progress) }],
           notes: 'Created via MCP Protocol action'
         };

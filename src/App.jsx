@@ -37,10 +37,88 @@ export default function App() {
     storageService.saveThresholds(thresholds);
   }, [thresholds]);
 
+  // ── BroadcastChannel Real-Time Cross-Tab Sync (Global Root Level) ──
+  const broadcastChannelRef = React.useRef(null);
+  const isExternalUpdate = React.useRef(false);
+  const isExternalThresholdUpdate = React.useRef(false);
+
+  useEffect(() => {
+    try {
+      broadcastChannelRef.current = new BroadcastChannel('omnipulse_sync');
+      broadcastChannelRef.current.onmessage = (event) => {
+        if (event.data?.type === 'TASKS_UPDATE' && event.data.tasks) {
+          isExternalUpdate.current = true;
+          setTasks(event.data.tasks);
+        }
+        if (event.data?.type === 'THRESHOLDS_UPDATE' && event.data.thresholds) {
+          isExternalThresholdUpdate.current = true;
+          setThresholds(event.data.thresholds);
+        }
+      };
+    } catch (e) {
+      // Degrade gracefully
+    }
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'omnipulse_tasks' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed) {
+            isExternalUpdate.current = true;
+            setTasks(parsed);
+          }
+        } catch (err) { /* ignore */ }
+      }
+      if (e.key === 'omnipulse_thresholds' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed) {
+            isExternalThresholdUpdate.current = true;
+            setThresholds(parsed);
+          }
+        } catch (err) { /* ignore */ }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      broadcastChannelRef.current?.close();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Broadcast task changes to other tabs
+  useEffect(() => {
+    if (isExternalUpdate.current) {
+      isExternalUpdate.current = false;
+      return;
+    }
+    try {
+      broadcastChannelRef.current?.postMessage({ type: 'TASKS_UPDATE', tasks });
+    } catch (e) { /* ignore */ }
+  }, [tasks]);
+
+  // Broadcast threshold changes to other tabs
+  useEffect(() => {
+    if (isExternalThresholdUpdate.current) {
+      isExternalThresholdUpdate.current = false;
+      return;
+    }
+    try {
+      broadcastChannelRef.current?.postMessage({ type: 'THRESHOLDS_UPDATE', thresholds });
+    } catch (e) { /* ignore */ }
+  }, [thresholds]);
+
   const handleAgentAction = (action) => {
     if (!action) return;
     if (action.type === 'ADD_TASK' && action.payload) {
-      setTasks(prev => [action.payload, ...prev]);
+      const nowIso = new Date().toISOString();
+      const taskWithTime = {
+        createdAt: nowIso,
+        lastModified: nowIso,
+        ...action.payload
+      };
+      setTasks(prev => [taskWithTime, ...prev]);
     } else if (action.type === 'UPDATE_THRESHOLD' && action.payload) {
       setThresholds(prev => ({ ...prev, globalTarget: action.payload.target }));
     }

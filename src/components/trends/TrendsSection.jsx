@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   TrendingUp, TrendingDown, Search, Cpu, Sparkles, BookOpen, Layers, 
-  HelpCircle, ArrowUpRight, ArrowDownRight, Tag, ShieldAlert, Radio, RefreshCw, ExternalLink, Globe
+  HelpCircle, ArrowUpRight, ArrowDownRight, Tag, ShieldAlert, Radio, RefreshCw, ExternalLink, Globe, Play, Pause, Zap, CheckCircle2
 } from 'lucide-react';
 import { ragEngine } from '../../services/ragEngine';
 import { liveNewsService } from '../../services/liveNewsService';
+
+// Format relative time helper for live news
+const getNewsRelativeTime = (isoDate, fallback) => {
+  if (!isoDate) return fallback || 'Just now';
+  const diff = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+  if (diff < 5) return 'Just now';
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
 
 export default function TrendsSection({ globalSearchQuery, theme }) {
   const [activeSubTab, setActiveSubTab] = useState('live_news'); // 'live_news', 'job_market', 'fashion_lifestyle'
@@ -13,17 +24,54 @@ export default function TrendsSection({ globalSearchQuery, theme }) {
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
 
-  const queryToUse = globalSearchQuery || localQuery;
-  const ragResults = ragEngine.search(queryToUse, activeSubTab === 'job_market' ? 'job_market' : 'lifestyle_fashion', 6);
+  // ── Automatic Live News Streaming Engine ──
+  const [isLiveStreaming, setIsLiveStreaming] = useState(true);
+  const [secondsToNextUpdate, setSecondsToNextUpdate] = useState(12);
+  const [newestNewsId, setNewestNewsId] = useState(null);
+  const [lastLiveTick, setLastLiveTick] = useState(() => new Date());
 
-  const handleRefreshNews = () => {
+  // Relative timestamp tick
+  const [, setTimeTick] = useState(0);
+  useEffect(() => {
+    const tickInterval = setInterval(() => setTimeTick(t => t + 1), 5000);
+    return () => clearInterval(tickInterval);
+  }, []);
+
+  const handleRefreshNews = useCallback((manual = false) => {
     setIsRefreshingNews(true);
     setTimeout(() => {
-      const fresh = liveNewsService.fetchLiveUpdates();
-      setNewsList(fresh);
+      setNewsList(prev => {
+        const fresh = liveNewsService.fetchLiveUpdates(prev);
+        if (fresh && fresh[0]) {
+          setNewestNewsId(fresh[0].id);
+        }
+        return fresh;
+      });
+      setLastLiveTick(new Date());
+      setSecondsToNextUpdate(12);
       setIsRefreshingNews(false);
-    }, 600);
-  };
+    }, manual ? 500 : 200);
+  }, []);
+
+  // Live streaming countdown interval
+  useEffect(() => {
+    if (!isLiveStreaming) return;
+
+    const interval = setInterval(() => {
+      setSecondsToNextUpdate(prev => {
+        if (prev <= 1) {
+          handleRefreshNews(false);
+          return 12;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isLiveStreaming, handleRefreshNews]);
+
+  const queryToUse = globalSearchQuery || localQuery;
+  const ragResults = ragEngine.search(queryToUse, activeSubTab === 'job_market' ? 'job_market' : 'lifestyle_fashion', 6);
 
   const filteredNews = newsCategory === 'All'
     ? newsList
@@ -163,20 +211,21 @@ export default function TrendsSection({ globalSearchQuery, theme }) {
       {/* LIVE WORLD NEWS TAB */}
       {activeSubTab === 'live_news' && (
         <div className="space-y-6">
-          {/* Live Bar Controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 glass-panel p-4">
-            <div className="flex items-center gap-2">
+          {/* Live Streaming Status & Controls Bar */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 glass-panel p-4 border-l-4 border-l-cyan-500">
+            {/* Sector filters */}
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Filter World Sector News:
+                Filter Sector:
               </span>
               <div className="flex items-center gap-1 overflow-x-auto text-xs">
                 {['All', 'Technology', 'Energy', 'Jobs', 'Finance', 'Bio'].map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setNewsCategory(cat)}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
                       newsCategory === cat
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-blue-600 text-white shadow-sm'
                         : 'bg-slate-200/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700'
                     }`}
                   >
@@ -186,64 +235,119 @@ export default function TrendsSection({ globalSearchQuery, theme }) {
               </div>
             </div>
 
-            <button
-              onClick={handleRefreshNews}
-              disabled={isRefreshingNews}
-              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-90 rounded-lg shadow-md transition-all active:scale-95 shrink-0"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingNews ? 'animate-spin' : ''}`} />
-              <span>{isRefreshingNews ? 'Fetching Live...' : 'Refresh Live Feed'}</span>
-            </button>
+            {/* Live Stream Telemetry & Refresh Actions */}
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              {/* Streaming state badge with countdown */}
+              <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-[11px] font-mono">
+                {isLiveStreaming ? (
+                  <>
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">LIVE STREAMING</span>
+                    <span className="text-slate-400 dark:text-slate-500">•</span>
+                    <span className="text-cyan-600 dark:text-cyan-400 font-bold">Tick in {secondsToNextUpdate}s</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">STREAM PAUSED</span>
+                  </>
+                )}
+              </div>
+
+              {/* Pause / Resume Button */}
+              <button
+                onClick={() => setIsLiveStreaming(!isLiveStreaming)}
+                title={isLiveStreaming ? 'Pause live streaming updates' : 'Resume live streaming updates'}
+                className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
+                  isLiveStreaming
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                }`}
+              >
+                {isLiveStreaming ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{isLiveStreaming ? 'Pause' : 'Resume'}</span>
+              </button>
+
+              {/* Manual Refresh Button */}
+              <button
+                onClick={() => handleRefreshNews(true)}
+                disabled={isRefreshingNews}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-90 rounded-lg shadow-md transition-all active:scale-95 shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingNews ? 'animate-spin' : ''}`} />
+                <span>{isRefreshingNews ? 'Streaming...' : 'Refresh Now'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Live News Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredNews.map((news) => (
-              <div
-                key={news.id}
-                className="glass-panel-interactive p-5 space-y-3 flex flex-col justify-between border-l-4 border-l-cyan-500"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-cyan-600 dark:text-cyan-400 font-mono text-[10px] bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                      {news.category}
-                    </span>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
-                      <span>{news.source}</span>
-                      <span>•</span>
-                      <span className="font-mono text-cyan-500 font-bold">{news.timestamp}</span>
+            {filteredNews.map((news) => {
+              const isNewlyArrived = news.id === newestNewsId || news.isNew;
+              return (
+                <div
+                  key={news.id}
+                  className={`glass-panel-interactive p-5 space-y-3 flex flex-col justify-between border-l-4 transition-all duration-500 ${
+                    isNewlyArrived
+                      ? 'border-l-emerald-500 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-500/10'
+                      : 'border-l-cyan-500'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs flex-wrap gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-cyan-600 dark:text-cyan-400 font-mono text-[10px] bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                          {news.category}
+                        </span>
+                        {isNewlyArrived && (
+                          <span className="animate-pulse bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-500/30 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> NEW DISPATCH
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
+                        <span className="font-medium">{news.source}</span>
+                        <span>•</span>
+                        <span className="font-mono text-cyan-500 font-bold">
+                          {getNewsRelativeTime(news.createdAtIso, news.timestamp)}
+                        </span>
+                      </div>
                     </div>
+
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                      {news.headline}
+                    </h3>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {news.summary}
+                    </p>
                   </div>
 
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
-                    {news.headline}
-                  </h3>
+                  <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                    <div className="flex flex-wrap gap-1">
+                      {news.relatedSectors.map((sec, i) => (
+                        <span key={i} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700">
+                          #{sec}
+                        </span>
+                      ))}
+                    </div>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {news.summary}
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px]">
-                  <div className="flex flex-wrap gap-1">
-                    {news.relatedSectors.map((sec, i) => (
-                      <span key={i} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700">
-                        #{sec}
-                      </span>
-                    ))}
+                    <a
+                      href={news.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 font-semibold text-blue-600 dark:text-cyan-400 hover:underline shrink-0"
+                    >
+                      <span>Read Article</span> <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-
-                  <a
-                    href={news.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 font-semibold text-blue-600 dark:text-cyan-400 hover:underline shrink-0"
-                  >
-                    <span>Read Article</span> <ExternalLink className="w-3 h-3" />
-                  </a>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -17,6 +17,7 @@ const DEFAULT_TASKS = [
     targetThreshold: 85,
     currentProgress: 90,
     completed: true,
+    createdAt: '2026-09-10T10:00:00.000Z',
     date: '2026-09-10',
     lastModified: '2026-09-10T14:30:00.000Z',
     history: [
@@ -35,6 +36,7 @@ const DEFAULT_TASKS = [
     targetThreshold: 75,
     currentProgress: 80,
     completed: true,
+    createdAt: '2026-09-11T08:30:00.000Z',
     date: '2026-09-11',
     lastModified: '2026-09-11T09:15:00.000Z',
     history: [
@@ -54,6 +56,7 @@ const DEFAULT_TASKS = [
     targetThreshold: 90,
     currentProgress: 95,
     completed: true,
+    createdAt: '2026-09-12T11:20:00.000Z',
     date: '2026-09-12',
     lastModified: '2026-09-12T16:45:00.000Z',
     history: [
@@ -74,6 +77,7 @@ const DEFAULT_TASKS = [
     targetThreshold: 80,
     currentProgress: 60,
     completed: false,
+    createdAt: '2026-09-13T14:15:00.000Z',
     date: '2026-09-13',
     lastModified: '2026-09-13T18:20:00.000Z',
     history: [
@@ -95,6 +99,7 @@ const DEFAULT_TASKS = [
     targetThreshold: 70,
     currentProgress: 70,
     completed: true,
+    createdAt: '2026-09-13T16:00:00.000Z',
     date: '2026-09-13',
     lastModified: '2026-09-13T21:00:00.000Z',
     history: [
@@ -111,7 +116,12 @@ export const storageService = {
   getTasks: () => {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.TASKS);
-      return data ? JSON.parse(data) : DEFAULT_TASKS;
+      const parsed = data ? JSON.parse(data) : DEFAULT_TASKS;
+      return parsed.map(task => ({
+        ...task,
+        createdAt: task.createdAt || task.lastModified || (task.date ? `${task.date}T09:00:00.000Z` : new Date().toISOString()),
+        lastModified: task.lastModified || task.createdAt || new Date().toISOString()
+      }));
     } catch (e) {
       return DEFAULT_TASKS;
     }

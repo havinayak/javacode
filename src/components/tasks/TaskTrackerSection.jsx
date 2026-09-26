@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Plus, CheckCircle2, Circle, Trash2, PieChart as PieIcon, BarChart3, LineChart as LineIcon, 
   Sliders, Target, Sparkles, AlertCircle, RefreshCw, FunctionSquare, Zap, Radio, 
-  Play, Pause, Timer, Clock, Download, FileText, ChevronDown, ChevronUp, Edit2
+  Play, Pause, Timer, Clock, Download, FileText, ChevronDown, ChevronUp, Edit2,
+  Check, X, Pencil, Calendar
 } from 'lucide-react';
 import { 
   ResponsiveContainer, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, 
@@ -38,6 +39,25 @@ const getRelativeTime = (isoDate) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
+// Helper: format actual creation time (e.g. Sep 26, 2026, 7:15 PM)
+const formatCreationTime = (isoDate) => {
+  if (!isoDate) return 'Recently';
+  try {
+    const d = new Date(isoDate);
+    if (isNaN(d.getTime())) return isoDate;
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (e) {
+    return isoDate;
+  }
+};
+
 export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThresholds, theme }) {
   const [activeChartType, setActiveChartType] = useState('line');
   const [algebraicFuncType, setAlgebraicFuncType] = useState('exponential');
@@ -48,6 +68,46 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
   const [expandedTaskId, setExpandedTaskId] = useState(null);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteText, setNoteText] = useState('');
+
+  // Task Title Inline Renaming State
+  const [editingTitleId, setEditingTitleId] = useState(null);
+  const [editTitleText, setEditTitleText] = useState('');
+  const editTitleInputRef = useRef(null);
+
+  const startRenameTask = (task) => {
+    setEditingTitleId(task.id);
+    setEditTitleText(task.title);
+    setTimeout(() => {
+      if (editTitleInputRef.current) {
+        editTitleInputRef.current.focus();
+        editTitleInputRef.current.select();
+      }
+    }, 50);
+  };
+
+  const saveRenameTask = (taskId) => {
+    const trimmed = editTitleText.trim();
+    if (!trimmed) return;
+    const nowIso = new Date().toISOString();
+    const updated = tasks.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          title: trimmed,
+          lastModified: nowIso
+        };
+      }
+      return t;
+    });
+    setTasks(updated);
+    setEditingTitleId(null);
+    setEditTitleText('');
+  };
+
+  const cancelRenameTask = () => {
+    setEditingTitleId(null);
+    setEditTitleText('');
+  };
 
   // New Task Form Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -67,79 +127,6 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
     const interval = setInterval(() => setTimeTick(t => t + 1), 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // ── BroadcastChannel Real-Time Cross-Tab Sync (Tasks & Thresholds) ──
-  const broadcastChannelRef = useRef(null);
-  const isExternalUpdate = useRef(false);
-  const isExternalThresholdUpdate = useRef(false);
-
-  useEffect(() => {
-    try {
-      broadcastChannelRef.current = new BroadcastChannel('omnipulse_sync');
-      broadcastChannelRef.current.onmessage = (event) => {
-        if (event.data?.type === 'TASKS_UPDATE') {
-          isExternalUpdate.current = true;
-          setTasks(event.data.tasks);
-        }
-        if (event.data?.type === 'THRESHOLDS_UPDATE') {
-          isExternalThresholdUpdate.current = true;
-          setThresholds(event.data.thresholds);
-        }
-      };
-    } catch (e) {
-      // BroadcastChannel not supported, degrade gracefully
-    }
-
-    // Also listen for localStorage changes from other tabs
-    const handleStorageChange = (e) => {
-      if (e.key === 'omnipulse_tasks') {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed) {
-            isExternalUpdate.current = true;
-            setTasks(parsed);
-          }
-        } catch (e) { /* ignore */ }
-      }
-      if (e.key === 'omnipulse_thresholds') {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed) {
-            isExternalThresholdUpdate.current = true;
-            setThresholds(parsed);
-          }
-        } catch (e) { /* ignore */ }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      broadcastChannelRef.current?.close();
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [setTasks, setThresholds]);
-
-  // Broadcast task changes to other tabs
-  useEffect(() => {
-    if (isExternalUpdate.current) {
-      isExternalUpdate.current = false;
-      return;
-    }
-    try {
-      broadcastChannelRef.current?.postMessage({ type: 'TASKS_UPDATE', tasks });
-    } catch (e) { /* ignore */ }
-  }, [tasks]);
-
-  // Broadcast threshold changes to other tabs
-  useEffect(() => {
-    if (isExternalThresholdUpdate.current) {
-      isExternalThresholdUpdate.current = false;
-      return;
-    }
-    try {
-      broadcastChannelRef.current?.postMessage({ type: 'THRESHOLDS_UPDATE', thresholds });
-    } catch (e) { /* ignore */ }
-  }, [thresholds]);
 
   // ── Live Task Stopwatch Timer Engine ──
   useEffect(() => {
@@ -199,20 +186,22 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
+    const now = new Date();
+    const nowIso = now.toISOString();
+
     const newTask = {
       id: `task-${Date.now()}`,
-      title: newTaskTitle,
+      title: newTaskTitle.trim(),
       category: newTaskCategory,
       priority: newTaskPriority,
       targetThreshold: Number(newTaskThreshold),
       currentProgress: Number(newTaskProgress),
       completed: Number(newTaskProgress) >= Number(newTaskThreshold),
-      date: new Date().toISOString().split('T')[0],
-      lastModified: new Date().toISOString(),
+      createdAt: nowIso,
+      date: nowIso.split('T')[0],
+      lastModified: nowIso,
       history: [
-        { date: '2026-09-10', score: 30 },
-        { date: '2026-09-11', score: 50 },
-        { date: '2026-09-12', score: Number(newTaskProgress) }
+        { date: 'Initial', score: Number(newTaskProgress) }
       ],
       notes: 'Newly created task'
     };
@@ -651,11 +640,64 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
                         <Circle className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                       )}
                     </button>
-                    <div>
-                      <h4 className={`text-sm font-bold ${task.completed ? 'line-through text-slate-400' : 'text-slate-900 dark:text-slate-100'}`}>
-                        {task.title}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      {editingTitleId === task.id ? (
+                        <div className="flex items-center gap-1.5 w-full mb-1">
+                          <input
+                            ref={editTitleInputRef}
+                            type="text"
+                            value={editTitleText}
+                            onChange={(e) => setEditTitleText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                saveRenameTask(task.id);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                cancelRenameTask();
+                              }
+                            }}
+                            className="w-full px-2.5 py-1 text-xs font-bold bg-white dark:bg-slate-900 border-2 border-cyan-500 rounded text-slate-900 dark:text-slate-100 focus:outline-none shadow-sm"
+                            placeholder="Task name..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => saveRenameTask(task.id)}
+                            title="Save Rename (Enter)"
+                            className="p-1 text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors shrink-0"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelRenameTask}
+                            title="Cancel Rename (Esc)"
+                            className="p-1 text-slate-400 hover:text-slate-200 bg-slate-200 dark:bg-slate-800 rounded transition-colors shrink-0"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 group/title">
+                          <h4 
+                            onClick={() => startRenameTask(task)}
+                            title="Click or use pencil to rename task"
+                            className={`text-sm font-bold cursor-pointer hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors ${task.completed ? 'line-through text-slate-400' : 'text-slate-900 dark:text-slate-100'}`}
+                          >
+                            {task.title}
+                          </h4>
+                          <button
+                            type="button"
+                            onClick={() => startRenameTask(task)}
+                            title="Rename Task"
+                            className="opacity-60 group-hover/title:opacity-100 p-0.5 text-slate-400 hover:text-cyan-500 dark:hover:text-cyan-400 rounded transition-all"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded text-white" style={{ backgroundColor: CATEGORY_COLORS[task.category] || '#3b82f6' }}>
                           {task.category}
                         </span>
@@ -665,11 +707,25 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                           Threshold: {task.targetThreshold}%
                         </span>
-                        {/* Live Relative Timestamp */}
-                        {task.lastModified && (
-                          <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono flex items-center gap-0.5">
-                            <Clock className="w-3 h-3" />
-                            {getRelativeTime(task.lastModified)}
+
+                        {/* Actual Creation Timestamp */}
+                        <span 
+                          title={`Exact created timestamp: ${task.createdAt || task.lastModified || 'N/A'}`}
+                          className="text-[10px] text-slate-600 dark:text-slate-300 font-mono flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700/60"
+                        >
+                          <Calendar className="w-3 h-3 text-cyan-500" />
+                          <span className="text-slate-400 dark:text-slate-500">Created:</span>
+                          <span className="font-semibold">{formatCreationTime(task.createdAt || task.lastModified || task.date)}</span>
+                          <span className="text-cyan-600 dark:text-cyan-400">({getRelativeTime(task.createdAt || task.lastModified)})</span>
+                        </span>
+
+                        {/* Modified Timestamp if updated */}
+                        {task.lastModified && task.createdAt && task.lastModified !== task.createdAt && (
+                          <span 
+                            title={`Last updated: ${formatCreationTime(task.lastModified)}`}
+                            className="text-[9px] text-slate-400 dark:text-slate-500 font-mono"
+                          >
+                            (Edited {getRelativeTime(task.lastModified)})
                           </span>
                         )}
                       </div>
@@ -677,6 +733,14 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
+                    {/* Rename Button in Toolbar */}
+                    <button
+                      onClick={() => startRenameTask(task)}
+                      title="Rename Task"
+                      className="p-1 text-slate-400 hover:text-cyan-500 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                     {/* Expand / Collapse Notes & History */}
                     <button
                       onClick={() => {
@@ -897,6 +961,12 @@ export default function TaskTrackerSection({ tasks, setTasks, thresholds, setThr
                   onChange={(e) => setNewTaskThreshold(e.target.value)}
                   className="w-full h-1.5 bg-slate-300 dark:bg-slate-800 rounded appearance-none accent-cyan-400"
                 />
+              </div>
+
+              {/* Live Creation Timestamp Notice */}
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-slate-700 dark:text-slate-300 text-[11px] font-mono">
+                <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                <span>Live creation timestamp: <strong>{new Date().toLocaleString()}</strong></span>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
